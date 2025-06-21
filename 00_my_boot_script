@@ -1,0 +1,70 @@
+#!/system/bin/sh
+
+# 20-06-2025 - vishal chavda - https://github.com/itsvishalchavda
+# make sure this script is chmod 755 and placed in /system/etc/init.d/
+# run as non-blocking - background process
+# the primary objective of this script is as follow
+# it's intended for rooted sony xperia tipo dual
+# as its touch has been broken - accessing screen through adb
+# for fail-safe running this script to make sure adb is always on
+# even if it get disabled mistakenly. it will start again during boot
+# without touch screen
+# for adb over tcpip -> it's reuire for chrooted linux via linux deploy
+# to control device through adb over ip
+# ps - never use windows notpad for linux script
+
+# Log file for debugging
+LOG_FILE=/data/local/tmp/my_boot_log.txt
+
+# this creates file or fresh start
+echo "First boot script started in init.d..." > $LOG_FILE
+
+sleep 30  # waits for 30 seconds to give time to other boot initialisation
+
+# to append text use >>
+echo "Continuing after 30 seconds..." >> $LOG_FILE
+
+
+echo "checking current USB config property..." >> $LOG_FILE
+USB_CONFIG=$(getprop persist.sys.usb.config)
+echo "Current USB config: $USB_CONFIG" >> $LOG_FILE
+
+# Check if ADB is enabled over USB
+# here 0 is true and none-zero is false as oppose to C++
+if echo "$USB_CONFIG" | grep -q "adb"; then
+    echo "ADB is already enabled. No changes made." >> $LOG_FILE
+else
+    echo "ADB not enabled. Enabling ADB with MTP..." >> $LOG_FILE
+    setprop persist.sys.usb.config adb,mtp
+    stop adbd
+    sleep 30
+    start adbd
+    sleep 30
+    echo "ADB enabled and ADB daemon restarted." >> $LOG_FILE
+fi
+
+# Start ADB over TCP/IP only if USB is DISCONNECTED on boot
+USB_STATUS=$(cat /sys/class/android_usb/android0/state 2>/dev/null)
+
+if [ "$USB_STATUS" = "DISCONNECTED" ]; then
+    setprop service.adb.tcp.port 5555
+    stop adbd
+    sleep 30
+    start adbd
+    sleep 10
+    echo "USB disconnected. ADB over TCP/IP started." >> $LOG_FILE
+else
+    echo "USB connected or in unknown state. Skipping ADB over TCP." >> $LOG_FILE
+fi
+
+echo "Starting Linux Deploy UI with Monkey..." >> $LOG_FILE
+monkey -p ru.meefik.linuxdeploy -c android.intent.category.LAUNCHER 1 >> $LOG_FILE 2>&1
+sleep 10
+echo "Starting Linux Deploy service..." >> $LOG_FILE
+/data/data/ru.meefik.linuxdeploy/files/bin/linuxdeploy start >> $LOG_FILE 2>&1
+sleep 20
+echo "Running chrooted mybootscript..." >> $LOG_FILE
+chroot /data/local/linux /etc/init.d/mybootscript >> $LOG_FILE 2>&1
+sleep 5
+echo "All initialisation completed..." >> $LOG_FILE 
+

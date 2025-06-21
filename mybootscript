@@ -1,0 +1,29 @@
+#!/bin/bash
+# 21-06-2025 vishal chavda - github.com/itsvishalchavda
+# mybootscript : for starting SSHD and other services on
+# chroot from linux deploy on android 4.0.4 xperia tipo dual
+
+LOGFILE="/var/log/mybootscript.log"
+
+exec > "$LOGFILE" 2>&1
+
+now()
+{
+  echo "[$(date)]"
+}
+
+echo "$(now) starting mybootscript..."
+echo "$(now) starting sshd..."
+
+/usr/sbin/sshd
+SSHD_STATUS=$?
+sleep 7
+
+if [[ $SSHD_STATUS -eq 0 ]]; then
+  echo "$(now) sshd started success..."
+else
+  echo "$(now) sshd fail to start..."
+fi
+
+echo "$(now) mybootscript completed..."
+
